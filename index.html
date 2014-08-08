@@ -1,0 +1,26 @@
+
+<html>
+  <body>
+    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script>
+      var nums = [80, 53, 125, 200, 28, 97];
+      var svg = d3.select('body').append('svg')
+      	.attr('height', 200)
+      	.attr('width', 200);
+      var bars = svg.selectAll('rect')
+      	.data(nums)
+      bars.enter().append('rect');
+      bars.attr('width', 20)
+      	.attr('height', 20)
+      	.attr('x', function(d, i) {
+      			return 30*i;
+      		})
+      	.attr('height', function(d, i) {
+      			return d;
+      		})
+      	.attr('y', function(d, i) {
+      		return 200 - d;
+      		})
+    </script>
+  </body>
+</html>
