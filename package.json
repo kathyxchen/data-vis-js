@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "coffee-script": "^1.7.1"
+    "coffee-script": "^1.7.1",
+    "d3": "^3.4.11"
   }
 }
