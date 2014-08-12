@@ -2,182 +2,110 @@
 <html>
   <head>
     <meta charset="utf-8"/>
-    <title>Dynamic Table</title>
-    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <title>Force-Directed Graph</title>
+    <script src="node_modules/d3/d3.min.js" charset="utf-8"></script>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>
     <style>
-      body {
-      	font: 24px monospace
+      path.link {
+      	fill: none;
+      	stroke: #666;
+      	stroke-width: 1.5px;
       }
-      table {
-      	margin: 10px;
-      	font-size: 24px;
+      circle {
+      	fill: #ccc;
+      	stroke: #fff;
+      	stroke-width: 1.5px;
       }
-      td {
-      	padding: 5px;
-      	border-bottom: 1px solid black;
-      }
-      td.update {
-      	color: blue;
-      }
-      td.enter {
-      	color: green;
-      }
-      td.exit, tr.exit td {
-      	color: red;
-      }
-      td.row-header {
-      	border-right: 1px solid black;
-      	font-weight: bold;
+      text {
+      	fill: #000;
+      	font: 10px sans-serif;
+      	pointer-events: none;
       }
     </style>
   </head>
   <body>
-    <table></table>
     <script>
-      // function that returns a key-value pair
-      var make_key_value = function(k, v) {
-      	return {
-      		key: k,
-      		value: v
-      	};
-      };
+      d3.csv("data/example.csv", function(error, links) {
+      	var nodes = {};
+      	
+      	// links is an array of objects
+      	// in rows: for each row
+      	links.forEach(function(link) {
+      		// if doesn't match any node values yet, create a new one
+      		link.source = nodes[link.source] || 
+      			(nodes[link.source] = {name: link.source});
+      		link.target = nodes[link.target] || 
+      			(nodes[link.target] = {name: link.target});
+      		link.value = +link.value;
+      	});
+      	
+      	var width = 960, 
+      		height = 500;
       
-      // join a key array with a data array 
-      // return an array of key-value objects
-      var merge = function(keys, data) {
-      	var d = [];
-      	for (var i = 0; i < keys.length; i++) {
-      		d.push(make_key_value(keys[i], data[i].slice()));
+      	var force = d3.layout.force() 
+      		.nodes(d3.values(nodes))
+      		.links(links)
+      		.size([width, height])
+      		.linkDistance(60)
+      		.charge(-300)
+      		.on("tick", tick)
+      		.start();
+      
+      	var svg = d3.select("body").append("svg")
+      		.attr("width", width)
+      		.attr("height", height);
+      
+      	svg.append("svg:defs").selectAll("marker")
+      			.data(["end"])
+      		.enter().append("svg:marker")
+      			.attr("id", String)
+      			.attr("viewBox", "0 -5 10 10")
+      			.attr("refX", 15)
+      			.attr("refY", -1.5)
+      			.attr("markerWidth", 6)
+      			.attr("markerHeight", 6)
+      			.attr("orient", "auto")
+      		.append("svg:path")
+      			.attr("d", "M0,-5L10,0L0,5");
+      
+      	var path = svg.append("svg:g").selectAll("path")
+      			.data(force.links())
+      		.enter().append("svg:path")
+      			.attr("class", "link")
+      			.attr("marker-end", "url(#end)");
+      
+      	var node = svg.selectAll(".node")
+      			.data(force.nodes())
+      		.enter().append("g")
+      			.attr("class", "node")
+      			.call(force.drag);
+      
+      	node.append("circle")
+      		.attr("r", 5);
+      
+      	node.append("text")
+      		.attr("x", 12)
+      		.attr("dy", ".35em")
+      		.text(function(d) { return d.name; });
+      
+      	function tick() {
+      		path.attr("d", function(d) {
+      			var dx = d.target.x - d.source.x,
+      				dy = d.target.y - d.source.y,
+      				dr = Math.sqrt(dx * dx + dy * dy);
+      			return "M" + 
+      				d.source.x + "," + 
+      				d.source.y + "A" + 
+      				dr + "," + dr + " 0 0,1 " + 
+      				d.target.x + "," + 
+      				d.target.y;
+      		});
+      		node.attr("transform", function(d) {
+      			return "translate(" + d.x + "," + d.y + ")"; 
+      			});
       	}
-      	return d;
-      };
       
-      function shuffle(array) {
-      	var m = array.length;
-      	var t;
-      	var i;
-      	while(m) {
-      		//shuffling random values
-      		i = Math.floor(Math.random() * m--); 
-      		t = array[m];
-      		array[m] = array[i];
-      		array[i] = t;
-      	}
-      	return array;
-      };
-      
-      function get_random_int(min, max) {
-      	return Math.floor(Math.random() * (max - min + 1)) + min;
-      };
-      
-      function update_array(a, new_size) {
-      	a = a || [];
-      	if (a.length > new_size) {
-      		return a.slice(0, new_size);
-      	}
-      
-      	var delta = new_size - a.length;
-      	for (var i = 0; i < delta; i++) {
-      		a.push(get_random_int(0, 9));
-      	}
-      	return a;
-      };
-      
-      //generate data
-      var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-      var letter_to_data = {};
-      var generate_data = function() {
-      	var i, j, a, l;
-      	var letters = shuffle(alphabet);
-      	var num_cols = get_random_int(3, 10);
-      	var num_rows = get_random_int(5, 15);
-      
-      	var row_data = []; //array of arrays
-      	for (i = 0; i < num_rows; i++) {
-      		l = letters[i]; //key
-      		a = update_array(letter_to_data[l], num_cols);
-      		letter_to_data[l] = a; //value is an array
-      		row_data.push(a);
-      	}
-      
-      	for (i = num_rows; i < letters.length; i++) {
-      		delete letter_to_data[i];
-      	}
-      
-      	letters = letters.slice(0, num_rows);
-      	console.log(letter_to_data);
-      	return merge(letters, row_data);
-      };
-      
-      //helper functions
-      var get_key = function(d) {
-      	return d && d.key; //returns the key as long as d isn't null
-      };
-      
-      var extract_row_data = function(d) {
-      	var values = d.value.slice();
-      
-      	values.unshift(d.key);
-      	return values;
-      };
-      
-      var ident = function(d) {
-      	return d;
-      };
-      
-      //update table
-      var table = d3.select('table');
-      
-      var update = function(new_data) {
-      	var rows = table.selectAll('tr').data(new_data, get_key);
-      
-      	var cells = rows.selectAll('td').data(extract_row_data);
-      	cells.attr('class', 'update');
-      	cells.enter().append('td')
-      		.style('opacity', 0.0)
-      		.attr('class', 'enter')
-      		.transition()
-      		.delay(900)
-      		.duration(500)
-      		.style('opacity', 1.0);
-      
-      	cells.text(ident);
-      
-      	cells.exit()
-      		.attr('class', 'exit')
-      		.transition()
-      		.delay(200)
-      		.duration(500)
-      		.style('opacity', 0.0)
-      		.remove();
-      
-      	var cells_in_new_rows = rows.enter().append('tr')
-      								.selectAll('td')
-      								.data(extract_row_data);
-      	cells_in_new_rows.enter().append('td')
-      		.style('opacity', 0.0)
-      		.attr('class', 'enter')
-      		.transition()
-      		.delay(900)
-      		.duration(500)
-      		.style('opacity', 1.0);
-      	cells_in_new_rows.text(ident);
-      
-      	rows.exit()
-      		.attr('class', 'exit')
-      		.transition()
-      		.delay(200)
-      		.duration(500)
-      		.style('opacity', 0.0)
-      		.remove();
-      	table.selectAll('tr').select('td').classed('row-header', true);
-      };
-      
-      update(generate_data());
-      
-      setInterval(function() {
-      	update(generate_data());
-      	}, 4000);
+      });
     </script>
   </body>
 </html>
